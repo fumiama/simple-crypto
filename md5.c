@@ -49,7 +49,11 @@ static uint32_t to_uint32(const uint8_t *bytes) {
 }
 
 uint8_t* md5(const uint8_t *data, size_t data_len, uint8_t digest[16]) {
-	uint32_t w[16];
+	#ifdef WORDS_BIGENDIAN
+		uint32_t w[16];
+	#else
+		uint32_t* w;
+	#endif
 
 	// These vars will contain the hash
 	// Initialize variables - simple count in nibbles:
@@ -85,8 +89,12 @@ uint8_t* md5(const uint8_t *data, size_t data_len, uint8_t digest[16]) {
 	//for each 512-bit chunk of message:
 	for(offset=0; offset<new_len; offset += (512/8)) {
 		// break chunk into sixteen 32-bit words w[j], 0 ≤ j ≤ 15
-		for (i = 0; i < 16; i++)
-			w[i] = to_uint32(msg + offset + i*4);
+		#ifdef WORDS_BIGENDIAN
+			for (i = 0; i < 16; i++)
+				w[i] = to_uint32(msg + offset + i*4);
+		#else
+			w = (uint32_t*)(msg + offset);
+		#endif
 
 		// Initialize hash value for this chunk:
 		a = h0;
@@ -95,28 +103,41 @@ uint8_t* md5(const uint8_t *data, size_t data_len, uint8_t digest[16]) {
 		d = h3;
 
 		// Main loop:
-		for(i = 0; i<64; i++) {
-
-			if (i < 16) {
-				f = (b & c) | ((~b) & d);
-				g = i;
-			} else if (i < 32) {
-				f = (d & b) | ((~d) & c);
-				g = (5*i + 1) % 16;
-			} else if (i < 48) {
-				f = b ^ c ^ d;
-				g = (3*i + 5) % 16;          
-			} else {
-				f = c ^ (b | (~d));
-				g = (7*i) % 16;
-			}
-
+		for(i = 0; i < 16; i++) {
+			f = (b & c) | ((~b) & d);
+			g = i;
 			temp = d;
 			d = c;
 			c = b;
-			b = b + LEFTROTATE((a + f + k[i] + w[g]), r[i]);
+			b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);
 			a = temp;
-
+		}
+		for(i = 16; i < 32; i++) {
+			f = (d & b) | ((~d) & c);
+			g = (5*i + 1) % 16;
+			temp = d;
+			d = c;
+			c = b;
+			b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);
+			a = temp;
+		}
+		for(i = 32; i < 48; i++) {
+			f = b ^ c ^ d;
+			g = (3*i + 5) % 16;
+			temp = d;
+			d = c;
+			c = b;
+			b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);
+			a = temp;
+		}
+		for(i = 48; i < 64; i++) {
+			f = c ^ (b | (~d));
+			g = (7*i) % 16;
+			temp = d;
+			d = c;
+			c = b;
+			b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);
+			a = temp;
 		}
 
 		// Add this chunk's hash to result so far:
@@ -124,7 +145,6 @@ uint8_t* md5(const uint8_t *data, size_t data_len, uint8_t digest[16]) {
 		h1 += b;
 		h2 += c;
 		h3 += d;
-
 	}
 
 	// cleanup
@@ -139,11 +159,12 @@ uint8_t* md5(const uint8_t *data, size_t data_len, uint8_t digest[16]) {
 }
 
 #ifdef TEST_SIMPLE_CRYPTO
+#include <stdio.h>
 int main(int argc, char **argv) {
 	char *msg;
 	size_t len;
 	int i;
-	uint8_t* result;
+	uint8_t result[16];
 
 	if (argc < 2) {
 		printf("usage: %s 'string'\n", argv[0]);
@@ -152,12 +173,11 @@ int main(int argc, char **argv) {
 	msg = argv[1];
 
 	len = strlen(msg);
-	result = md5((uint8_t*)msg, len);
+	md5((uint8_t*)msg, len, result);
 	// display result
 	for (i = 0; i < 16; i++)
 		printf("%2.2x", result[i]);
-	puts("");
-	free(result);
+	putchar('\n');
 
 	return 0;
 }
