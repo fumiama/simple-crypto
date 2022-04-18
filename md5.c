@@ -51,7 +51,7 @@ static uint32_t to_uint32(const uint8_t *bytes) {
 #ifdef WORDS_BIGENDIAN
 	/* break chunk into sixteen 32-bit words w[j], 0 ≤ j ≤ 15 */
 	#define break_chunk_into_w(trunk)\
-		(for(i = 0; i < 16; i++) w[i] = to_uint32((trunk) + i*4))
+		for(i = 0; i < 16; i++) w[i] = to_uint32((trunk) + i*4)
 #else
 	/* break chunk into sixteen 32-bit words w[j], 0 ≤ j ≤ 15 */
 	#define break_chunk_into_w(trunk) (w = (uint32_t*)(trunk))
