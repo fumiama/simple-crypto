@@ -48,7 +48,75 @@ static uint32_t to_uint32(const uint8_t *bytes) {
 	#endif
 }
 
+#ifdef WORDS_BIGENDIAN
+	/* break chunk into sixteen 32-bit words w[j], 0 ≤ j ≤ 15 */
+	#define break_chunk_into_w(trunk)\
+		(for(i = 0; i < 16; i++) w[i] = to_uint32((trunk) + i*4))
+#else
+	/* break chunk into sixteen 32-bit words w[j], 0 ≤ j ≤ 15 */
+	#define break_chunk_into_w(trunk) (w = (uint32_t*)(trunk))
+#endif
+
+//for each 512-bit chunk of message:
+#define sum(trunk) {\
+	/* break chunk into sixteen 32-bit words w[j], 0 ≤ j ≤ 15 */\
+	break_chunk_into_w(trunk);\
+\
+	/* Initialize hash value for this chunk: */\
+	a = h0;\
+	b = h1;\
+	c = h2;\
+	d = h3;\
+\
+	/* Main loop: */\
+	for(i = 0; i < 16; i++) {\
+		f = (b & c) | ((~b) & d);\
+		g = i;\
+		temp = d;\
+		d = c;\
+		c = b;\
+		b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);\
+		a = temp;\
+	}\
+	for(i = 16; i < 32; i++) {\
+		f = (d & b) | ((~d) & c);\
+		g = (5*i + 1) % 16;\
+		temp = d;\
+		d = c;\
+		c = b;\
+		b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);\
+		a = temp;\
+	}\
+	for(i = 32; i < 48; i++) {\
+		f = b ^ c ^ d;\
+		g = (3*i + 5) % 16;\
+		temp = d;\
+		d = c;\
+		c = b;\
+		b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);\
+		a = temp;\
+	}\
+	for(i = 48; i < 64; i++) {\
+		f = c ^ (b | (~d));\
+		g = (7*i) % 16;\
+		temp = d;\
+		d = c;\
+		c = b;\
+		b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);\
+		a = temp;\
+	}\
+\
+	/* Add this chunk's hash to result so far: */\
+	h0 += a;\
+	h1 += b;\
+	h2 += c;\
+	h3 += d;\
+}
+
 uint8_t* md5(const uint8_t *data, size_t data_len, uint8_t digest[16]) {
+	// buffer of last trunk
+	uint8_t trunk[64];
+
 	#ifdef WORDS_BIGENDIAN
 		uint32_t w[16];
 	#else
@@ -62,95 +130,41 @@ uint8_t* md5(const uint8_t *data, size_t data_len, uint8_t digest[16]) {
 	uint32_t h2 = 0x98badcfe;
 	uint32_t h3 = 0x10325476;
 
-	// Message (to prepare)
-	uint8_t *msg = NULL;
-
-	size_t new_len, offset;
+	size_t offset = 0;
 	uint32_t a, b, c, d, i, f, g, temp;
 
-	//Pre-processing:
+	// Process the message in successive 512-bit chunks:
+	if(data_len >= 64)
+		for(offset=0; offset<data_len&(~0x3f); offset += 64)
+			sum(data+offset);
+
+	// Process the last trunk of message:
 	//append "1" bit to message    
 	//append "0" bits until message length in bits ≡ 448 (mod 512)
 	//append length mod (2^64) to message
+	i = data_len-offset;
+	if(i) memcpy(trunk, data+offset, i);
+	trunk[i++] = 0x80; // append the "1" bit; most significant bit is "first"
+	temp = 64-i;
+	if(temp) memset(&trunk[i], 0, temp); // append "0" bits
 
-	for (new_len = data_len + 1; new_len % (512/8) != 448/8; new_len++);
-
-	msg = (uint8_t*)malloc(new_len + 8);
-	memcpy(msg, data, data_len);
-	msg[data_len] = 0x80; // append the "1" bit; most significant bit is "first"
-	memset(&msg[data_len+1], 0, new_len-data_len-1); // append "0" bits
-
-	// append the len in bits at the end of the buffer.
-	to_bytes(data_len*8, msg + new_len);
-	// initial_len>>29 == initial_len*8>>32, but avoids overflow.
-	to_bytes(data_len>>29, msg + new_len + 4);
-
-	// Process the message in successive 512-bit chunks:
-	//for each 512-bit chunk of message:
-	for(offset=0; offset<new_len; offset += (512/8)) {
-		// break chunk into sixteen 32-bit words w[j], 0 ≤ j ≤ 15
-		#ifdef WORDS_BIGENDIAN
-			for (i = 0; i < 16; i++)
-				w[i] = to_uint32(msg + offset + i*4);
-		#else
-			w = (uint32_t*)(msg + offset);
-		#endif
-
-		// Initialize hash value for this chunk:
-		a = h0;
-		b = h1;
-		c = h2;
-		d = h3;
-
-		// Main loop:
-		for(i = 0; i < 16; i++) {
-			f = (b & c) | ((~b) & d);
-			g = i;
-			temp = d;
-			d = c;
-			c = b;
-			b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);
-			a = temp;
-		}
-		for(i = 16; i < 32; i++) {
-			f = (d & b) | ((~d) & c);
-			g = (5*i + 1) % 16;
-			temp = d;
-			d = c;
-			c = b;
-			b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);
-			a = temp;
-		}
-		for(i = 32; i < 48; i++) {
-			f = b ^ c ^ d;
-			g = (3*i + 5) % 16;
-			temp = d;
-			d = c;
-			c = b;
-			b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);
-			a = temp;
-		}
-		for(i = 48; i < 64; i++) {
-			f = c ^ (b | (~d));
-			g = (7*i) % 16;
-			temp = d;
-			d = c;
-			c = b;
-			b += LEFTROTATE((a + f + k[i] + w[g]), r[i]);
-			a = temp;
-		}
-
-		// Add this chunk's hash to result so far:
-		h0 += a;
-		h1 += b;
-		h2 += c;
-		h3 += d;
+	//no enough space to fill the len in bits
+	//we need to process one more trunk
+	if(i > 56) {
+		sum(trunk);
+		memset(trunk, 0, 64);
 	}
 
-	// cleanup
-	free(msg);
+	// append the len in bits at the end of the buffer.
+	to_bytes(data_len * 8, &trunk[56]);
+	// initial_len>>29 == initial_len*8>>32, but avoids overflow.
+	to_bytes(data_len>>29, &trunk[60]);
 
-	//var char digest[16] := h0 append h1 append h2 append h3 //(Output is in little-endian)
+	//sum the last trunk
+	sum(trunk);
+
+	//var char digest[16] := h0 append h1 append h2 append h3
+	//(Output is in little-endian)
 	to_bytes(h0, &digest[0]);
 	to_bytes(h1, &digest[4]);
 	to_bytes(h2, &digest[8]);
