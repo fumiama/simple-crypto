@@ -135,7 +135,7 @@ uint8_t* md5(const uint8_t *data, size_t data_len, uint8_t digest[16]) {
 
 	// Process the message in successive 512-bit chunks:
 	if(data_len >= 64)
-		for(offset=0; offset<data_len&(~0x3f); offset += 64)
+		for(offset=0; offset<(data_len&(~0x3f)); offset += 64)
 			sum(data+offset);
 
 	// Process the last trunk of message:
@@ -174,25 +174,92 @@ uint8_t* md5(const uint8_t *data, size_t data_len, uint8_t digest[16]) {
 
 #ifdef TEST_SIMPLE_CRYPTO
 #include <stdio.h>
+#include <sys/stat.h>
+#include <time.h>
+
+unsigned long get_start_ms() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
 int main(int argc, char **argv) {
 	char *msg;
 	size_t len;
 	int i;
+	FILE* fp;
+	uint8_t* buf;
+	unsigned long t1, t2;
 	uint8_t result[16];
+	struct stat statbuf;
 
-	if (argc < 2) {
-		printf("usage: %s 'string'\n", argv[0]);
+	if (argc < 3) {
+		printf("usage: %s [options]\n\toptions:\n\t-s string: encode a string\n\t-f file: encode a file\n\t-b file: benchmark using the file\n", argv[0]);
 		return 1;
 	}
-	msg = argv[1];
-
-	len = strlen(msg);
-	md5((uint8_t*)msg, len, result);
-	// display result
-	for (i = 0; i < 16; i++)
-		printf("%2.2x", result[i]);
-	putchar('\n');
-
+	msg = argv[2];
+	switch(argv[1][1]) {
+		case 's':
+			len = strlen(msg);
+			md5((uint8_t*)msg, len, result);
+			// display result
+			for (i = 0; i < 16; i++)
+				printf("%2.2x", result[i]);
+			putchar('\n');
+		break;
+		case 'f':
+			if(stat(msg, &statbuf)) {
+				perror("stat: ");
+				return 1;
+			}
+			fp = fopen(msg, "rb");
+			if(!fp) {
+				perror("fopen: ");
+				return 2;
+			}
+			buf = malloc(statbuf.st_size);
+			if(!buf) {
+				perror("malloc: ");
+				return 3;
+			}
+			if(fread(buf, statbuf.st_size, 1, fp) != 1) {
+				perror("fread: ");
+				return 4;
+			}
+			md5(buf, statbuf.st_size, result);
+			// display result
+			for (i = 0; i < 16; i++)
+				printf("%2.2x", result[i]);
+			putchar('\n');
+			break;
+		case 'b':
+			if(stat(msg, &statbuf)) {
+				perror("stat: ");
+				return 1;
+			}
+			fp = fopen(msg, "rb");
+			if(!fp) {
+				perror("fopen: ");
+				return 2;
+			}
+			buf = malloc(statbuf.st_size);
+			if(!buf) {
+				perror("malloc: ");
+				return 3;
+			}
+			if(fread(buf, statbuf.st_size, 1, fp) != 1) {
+				perror("fread: ");
+				return 4;
+			}
+			t1 = get_start_ms();
+			for(int i = 0; i < 4; i++) {
+				md5(buf, statbuf.st_size, result);
+				buf[0] = result[0];
+			}
+			t2 = get_start_ms();
+			printf("benchmark: %lu ms.\n", t2-t1);
+			break;
+	}
 	return 0;
 }
 #endif
