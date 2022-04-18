@@ -8,6 +8,10 @@ if (${isBigEndian})
     add_definitions(-DWORDS_BIGENDIAN)
 endif()
 
+#在编译选项中加入c99支持
+add_compile_options(-std=c99)
+message(STATUS "optional:-std=c99")
+
 set(TEST 0)
 if(TEST)
     add_definitions(-DTEST_SIMPLE_CRYPTO)
