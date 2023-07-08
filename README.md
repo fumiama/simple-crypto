@@ -44,9 +44,9 @@ git clone https://github.com/fumiama/simple-crypto.git
 cd simple-crypto
 mkdir build
 cd build
-cmake ..
-make
-make install
+cmake -DCMAKE_BUILD_TYPE:STRING=Release ..
+cmake --build . --config Release --target all --
+cmake --install .
 ```
 
 # Usage
