@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#include "binary.h"
+
 // Constants are the integer part of the sines of integers (in radians) * 2^32.
 const static uint32_t k[64] = {
 	0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee ,
@@ -34,7 +36,7 @@ const static uint32_t r[] = {7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12,
 
 static void to_bytes(uint32_t val, uint8_t *bytes) {
 	#ifdef WORDS_BIGENDIAN
-		*(uint32_t*)bytes =  __builtin_bswap32(val);
+		*(uint32_t*)bytes =  _swap_32(val);
 	#else
 		*(uint32_t*)bytes = val;
 	#endif
@@ -42,7 +44,7 @@ static void to_bytes(uint32_t val, uint8_t *bytes) {
 
 static uint32_t to_uint32(const uint8_t *bytes) {
 	#ifdef WORDS_BIGENDIAN
-		return __builtin_bswap32(*(uint32_t*)bytes);
+		return _swap_32(*(uint32_t*)bytes);
 	#else
 		return *(uint32_t*)bytes;
 	#endif

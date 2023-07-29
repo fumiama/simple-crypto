@@ -8,6 +8,7 @@
 	#include <machine/endian.h>
 #endif
 #include "simplecrypto.h"
+#include "binary.h"
 
 const static uint32_t qqsumtable[0x10] = {
 	0x9e3779b9,
@@ -43,7 +44,7 @@ int64_t tea_encrypt_qq(const TEA t, const uint8_t* src, int64_t srclen, uint8_t*
 		#ifdef WORDS_BIGENDIAN
 			uint64_t block = ((uint64_t*)dst)[i];
 		#else
-			uint64_t block = __builtin_bswap64(((uint64_t*)dst)[i]);
+			uint64_t block = _swap_64(((uint64_t*)dst)[i]);
 		#endif
 		holder = block ^ iv1;
 		iv1 = holder;
@@ -60,7 +61,7 @@ int64_t tea_encrypt_qq(const TEA t, const uint8_t* src, int64_t srclen, uint8_t*
 		#ifdef WORDS_BIGENDIAN
 			((uint64_t*)dst)[i] = iv1;
 		#else
-			((uint64_t*)dst)[i] = __builtin_bswap64(iv1);
+			((uint64_t*)dst)[i] = _swap_64(iv1);
 		#endif
 	}
 	return dstlen;
@@ -81,7 +82,7 @@ int64_t tea_encrypt(const TEA t, const uint32_t sumtable[0x10], const uint8_t* s
 		#ifdef WORDS_BIGENDIAN
 			uint64_t block = ((uint64_t*)dst)[i];
 		#else
-			uint64_t block = __builtin_bswap64(((uint64_t*)dst)[i]);
+			uint64_t block = _swap_64(((uint64_t*)dst)[i]);
 		#endif
 		holder = block ^ iv1;
 		iv1 = holder;
@@ -98,7 +99,7 @@ int64_t tea_encrypt(const TEA t, const uint32_t sumtable[0x10], const uint8_t* s
 		#ifdef WORDS_BIGENDIAN
 			((uint64_t*)dst)[i] = iv1;
 		#else
-			((uint64_t*)dst)[i] = __builtin_bswap64(iv1);
+			((uint64_t*)dst)[i] = _swap_64(iv1);
 		#endif
 	}
 	return dstlen;
@@ -171,7 +172,7 @@ uint8_t* tea_decrypt_qq(const TEA t, const uint8_t* src, int64_t srclen, uint8_t
 		#ifdef WORDS_BIGENDIAN
 			iv1 = ((uint64_t*)(src))[i];
 		#else
-			iv1 = __builtin_bswap64(((uint64_t*)(src))[i]);
+			iv1 = _swap_64(((uint64_t*)(src))[i]);
 		#endif
 		iv2 ^= iv1;
 		uint32_t v1 = iv2;
@@ -185,7 +186,7 @@ uint8_t* tea_decrypt_qq(const TEA t, const uint8_t* src, int64_t srclen, uint8_t
 		#ifdef WORDS_BIGENDIAN
 			((uint64_t*)dst)[i] = iv2^holder;
 		#else
-			((uint64_t*)dst)[i] = __builtin_bswap64(iv2^holder);
+			((uint64_t*)dst)[i] = _swap_64(iv2^holder);
 		#endif
 		holder = iv1;
 	}
@@ -202,7 +203,7 @@ uint8_t* tea_decrypt(const TEA t, const uint32_t sumtable[0x10], const uint8_t* 
 		#ifdef WORDS_BIGENDIAN
 			iv1 = ((uint64_t*)(src))[i];
 		#else
-			iv1 = __builtin_bswap64(((uint64_t*)(src))[i]);
+			iv1 = _swap_64(((uint64_t*)(src))[i]);
 		#endif
 		iv2 ^= iv1;
 		uint32_t v1 = iv2;
@@ -216,7 +217,7 @@ uint8_t* tea_decrypt(const TEA t, const uint32_t sumtable[0x10], const uint8_t* 
 		#ifdef WORDS_BIGENDIAN
 			((uint64_t*)dst)[i] = iv2^holder;
 		#else
-			((uint64_t*)dst)[i] = __builtin_bswap64(iv2^holder);
+			((uint64_t*)dst)[i] = _swap_64(iv2^holder);
 		#endif
 		holder = iv1;
 	}
